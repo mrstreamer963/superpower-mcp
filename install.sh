@@ -1,4 +1,4 @@
-#\!/bin/bash
+#!/bin/bash
 
 # Superpowers MCP Server - Installation Script
 # 
@@ -24,6 +24,7 @@ NC='\033[0m' # No Color
 # Configuration - dynamically set based on user's home
 SUPERPOWERS_REPO_DIR="${HOME}/.augment/superpowers"
 PERSONAL_SKILLS_DIR="${HOME}/.augment/skills"
+AUGMENT_SETTINGS="${HOME}/.augment/settings.json"
 REPO_URL="https://github.com/obra/superpowers.git"
 
 # Detect where this script is located
@@ -33,12 +34,12 @@ MCP_SERVER_PATH="${SCRIPT_DIR}/superpowers-mcp.js"
 # Banner
 show_banner() {
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}║         Superpowers MCP Server for Augment                ║${NC}"
-    echo -e "${CYAN}║         Installation & Management Script                  ║${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    printf "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}║             Superpowers MCP Server for Augment             ║${NC}\n"
+    printf "${CYAN}║             Installation & Management Script               ║${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}\n"
     echo ""
 }
 
@@ -47,141 +48,232 @@ is_installed() {
     [ -d "$SUPERPOWERS_REPO_DIR" ] && [ -f "$MCP_SERVER_PATH" ]
 }
 
+# Add MCP server to Augment settings.json
+add_to_settings() {
+    if [ ! -f "$AUGMENT_SETTINGS" ]; then
+        printf "${YELLOW}Warning: Settings file not found at $AUGMENT_SETTINGS${NC}\n"
+        return 1
+    fi
+
+    # Create backup
+    cp "$AUGMENT_SETTINGS" "${AUGMENT_SETTINGS}.backup"
+
+    # Use Python to update JSON
+    python3 - <<EOF
+import json
+import sys
+
+try:
+    with open("$AUGMENT_SETTINGS", "r") as f:
+        settings = json.load(f)
+
+    # Initialize mcpServers if it doesn't exist
+    if "mcpServers" not in settings:
+        settings["mcpServers"] = {}
+
+    # Add superpowers server
+    settings["mcpServers"]["superpowers"] = {
+        "command": "node",
+        "args": ["$MCP_SERVER_PATH"]
+    }
+
+    # Write back with nice formatting
+    with open("$AUGMENT_SETTINGS", "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+
+    sys.exit(0)
+except Exception as e:
+    print(f"Error updating settings: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+    return $?
+}
+
+# Remove MCP server from Augment settings.json
+remove_from_settings() {
+    if [ ! -f "$AUGMENT_SETTINGS" ]; then
+        return 0  # Nothing to remove
+    fi
+
+    # Create backup
+    cp "$AUGMENT_SETTINGS" "${AUGMENT_SETTINGS}.backup"
+
+    # Use Python to update JSON
+    python3 - <<EOF
+import json
+import sys
+
+try:
+    with open("$AUGMENT_SETTINGS", "r") as f:
+        settings = json.load(f)
+
+    # Remove superpowers server if it exists
+    if "mcpServers" in settings and "superpowers" in settings["mcpServers"]:
+        del settings["mcpServers"]["superpowers"]
+
+        # Remove mcpServers key if it's now empty
+        if not settings["mcpServers"]:
+            del settings["mcpServers"]
+
+    # Write back with nice formatting
+    with open("$AUGMENT_SETTINGS", "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+
+    sys.exit(0)
+except Exception as e:
+    print(f"Error updating settings: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+    return $?
+}
+
 # Installation function
 install_superpowers() {
-    echo -e "${BLUE}Starting installation...${NC}"
+    printf "${BLUE}Starting installation...${NC}\n"
     echo ""
     
     # Check prerequisites
-    echo -e "${BLUE}Checking prerequisites...${NC}"
+    printf "${BLUE}Checking prerequisites...${NC}\n"
     
     # Check Node.js
-    if \! command -v node &> /dev/null; then
-        echo -e "${RED}✗ Node.js not found${NC}"
+    if ! command -v node &> /dev/null; then
+        printf "${RED}✗ Node.js not found${NC}\n"
         echo "  Please install Node.js v18+ from https://nodejs.org/"
         exit 1
     fi
-    
+
     NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
     if [ "$NODE_VERSION" -lt 18 ]; then
-        echo -e "${RED}✗ Node.js version too old (found v${NODE_VERSION}, need v18+)${NC}"
+        printf "${RED}✗ Node.js version too old (found v${NODE_VERSION}, need v18+)${NC}\n"
         echo "  Please upgrade Node.js from https://nodejs.org/"
         exit 1
     fi
-    echo -e "${GREEN}✓ Node.js v${NODE_VERSION} found${NC}"
-    
+    printf "${GREEN}✓ Node.js v${NODE_VERSION} found${NC}\n"
+
     # Check Git
-    if \! command -v git &> /dev/null; then
-        echo -e "${RED}✗ Git not found${NC}"
+    if ! command -v git &> /dev/null; then
+        printf "${RED}✗ Git not found${NC}\n"
         echo "  Please install Git from https://git-scm.com/"
         exit 1
     fi
-    echo -e "${GREEN}✓ Git found${NC}"
-    
+    printf "${GREEN}✓ Git found${NC}\n"
+
     # Clone superpowers repository if not exists
-    if [ \! -d "$SUPERPOWERS_REPO_DIR" ]; then
+    if [ ! -d "$SUPERPOWERS_REPO_DIR" ]; then
         echo ""
-        echo -e "${BLUE}Cloning Superpowers repository...${NC}"
+        printf "${BLUE}Cloning Superpowers repository...${NC}\n"
         echo "  Location: $SUPERPOWERS_REPO_DIR"
-        
+
         mkdir -p "$(dirname "$SUPERPOWERS_REPO_DIR")"
-        
-        if \! git clone "$REPO_URL" "$SUPERPOWERS_REPO_DIR" 2>&1; then
-            echo -e "${RED}✗ Failed to clone repository${NC}"
+
+        if ! git clone "$REPO_URL" "$SUPERPOWERS_REPO_DIR" 2>&1; then
+            printf "${RED}✗ Failed to clone repository${NC}\n"
             exit 1
         fi
-        
-        echo -e "${GREEN}✓ Repository cloned${NC}"
+
+        printf "${GREEN}✓ Repository cloned${NC}\n"
     else
         echo ""
-        echo -e "${GREEN}✓ Superpowers repository already exists${NC}"
+        printf "${GREEN}✓ Superpowers repository already exists${NC}\n"
         echo "  Location: $SUPERPOWERS_REPO_DIR"
     fi
-    
+
     # Create personal skills directory
-    if [ \! -d "$PERSONAL_SKILLS_DIR" ]; then
+    if [ ! -d "$PERSONAL_SKILLS_DIR" ]; then
         echo ""
-        echo -e "${BLUE}Creating personal skills directory...${NC}"
+        printf "${BLUE}Creating personal skills directory...${NC}\n"
         mkdir -p "$PERSONAL_SKILLS_DIR"
-        echo -e "${GREEN}✓ Personal skills directory created${NC}"
+        printf "${GREEN}✓ Personal skills directory created${NC}\n"
         echo "  Location: $PERSONAL_SKILLS_DIR"
     fi
-    
+
     # Verify MCP server exists
     echo ""
-    echo -e "${BLUE}Verifying MCP server...${NC}"
-    
-    if [ \! -f "$MCP_SERVER_PATH" ]; then
-        echo -e "${RED}✗ MCP server not found at expected location${NC}"
+    printf "${BLUE}Verifying MCP server...${NC}\n"
+
+    if [ ! -f "$MCP_SERVER_PATH" ]; then
+        printf "${RED}✗ MCP server not found at expected location${NC}\n"
         echo "  Expected: $MCP_SERVER_PATH"
         exit 1
     fi
-    
-    echo -e "${GREEN}✓ MCP server found${NC}"
-    
+
+    printf "${GREEN}✓ MCP server found${NC}\n"
+
     # Make MCP server executable
     chmod +x "$MCP_SERVER_PATH"
-    
+
     # Install npm dependencies
-    if [ \! -d "${SCRIPT_DIR}/node_modules" ]; then
+    if [ ! -d "${SCRIPT_DIR}/node_modules" ]; then
         echo ""
-        echo -e "${BLUE}Installing MCP server dependencies...${NC}"
+        printf "${BLUE}Installing MCP server dependencies...${NC}\n"
         cd "$SCRIPT_DIR"
         npm install
-        echo -e "${GREEN}✓ Dependencies installed${NC}"
+        printf "${GREEN}✓ Dependencies installed${NC}\n"
     fi
-    
-    # Success\!
+
+    # Update Augment settings
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}║              ✓ Installation Complete\!                     ║${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    printf "${BLUE}Updating Augment configuration...${NC}\n"
+    if add_to_settings; then
+        printf "${GREEN}✓ Settings updated${NC}\n"
+        echo "  Location: $AUGMENT_SETTINGS"
+    else
+        printf "${YELLOW}⚠ Could not automatically update settings${NC}\n"
+        echo ""
+        echo "Please manually add this to ~/.augment/settings.json:"
+        echo ""
+        printf "${BLUE}   \"mcpServers\": {${NC}\n"
+        printf "${BLUE}     \"superpowers\": {${NC}\n"
+        printf "${BLUE}       \"command\": \"node\",${NC}\n"
+        printf "${BLUE}       \"args\": [${NC}\n"
+        printf "${BLUE}         \"${MCP_SERVER_PATH}\"${NC}\n"
+        printf "${BLUE}       ]${NC}\n"
+        printf "${BLUE}     }${NC}\n"
+        printf "${BLUE}   }${NC}\n"
+    fi
+
+    # Success!
     echo ""
-    echo -e "${GREEN}Next Steps:${NC}"
+    printf "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}║                ✓ Installation Complete!                   ║${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}\n"
     echo ""
-    echo "1. Add this MCP server to your Augment configuration:"
+    printf "${GREEN}Next Steps:${NC}\n"
     echo ""
-    echo "   ${YELLOW}Edit ~/.augment/settings.json and add:${NC}"
+    echo "1. Restart Augment"
     echo ""
-    echo -e "${BLUE}   \"mcpServers\": {${NC}"
-    echo -e "${BLUE}     \"superpowers\": {${NC}"
-    echo -e "${BLUE}       \"command\": \"node\",${NC}"
-    echo -e "${BLUE}       \"args\": [${NC}"
-    echo -e "${BLUE}         \"${MCP_SERVER_PATH}\"${NC}"
-    echo -e "${BLUE}       ]${NC}"
-    echo -e "${BLUE}     }${NC}"
-    echo -e "${BLUE}   }${NC}"
-    echo ""
-    echo "2. Restart Augment"
-    echo ""
-    echo "3. Test it by asking Augment:"
-    echo "   ${BLUE}\"What skills are available?\"${NC}"
+    echo "2. Test it by asking Augment:"
+    printf "   ${BLUE}\"What skills are available?\"${NC}\n"
     echo "   You should see skills from the superpowers library"
     echo ""
-    echo -e "${GREEN}Documentation:${NC}"
+    printf "${GREEN}Documentation:${NC}\n"
     echo "  • Superpowers: https://github.com/obra/superpowers"
     echo "  • Blog post: https://blog.fsck.com/2025/10/09/superpowers/"
     echo ""
-    echo -e "${YELLOW}To update or uninstall later:${NC}"
-    echo "  Run: ${CYAN}./install.sh update${NC} or ${CYAN}./install.sh remove${NC}"
+    printf "${YELLOW}To update or uninstall later:${NC}\n"
+    printf "  Run: ${CYAN}./install.sh update${NC} or ${CYAN}./install.sh remove${NC}\n"
     echo ""
 }
 
 # Uninstallation function
 uninstall_superpowers() {
-    echo -e "${BLUE}Starting uninstallation...${NC}"
+    printf "${BLUE}Starting uninstallation...${NC}\n"
     echo ""
 
-    echo -e "${YELLOW}This will remove:${NC}"
+    printf "${YELLOW}This will remove:${NC}\n"
     echo "  • Superpowers repository: $SUPERPOWERS_REPO_DIR"
     echo ""
 
     # Ask about personal skills
     REMOVE_SKILLS="n"
     if [ -d "$PERSONAL_SKILLS_DIR" ]; then
-        echo -e "${YELLOW}Personal skills directory found:${NC}"
+        printf "${YELLOW}Personal skills directory found:${NC}\n"
         echo "  $PERSONAL_SKILLS_DIR"
         echo ""
         read -p "Do you want to remove personal skills too? [y/N] " -n 1 -r
@@ -193,61 +285,71 @@ uninstall_superpowers() {
     # Confirm uninstall
     read -p "Are you sure you want to uninstall? [y/N] " -n 1 -r
     echo ""
-    if [[ \! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Uninstall cancelled."
         exit 0
     fi
 
     # Remove superpowers repository
     echo ""
-    echo -e "${BLUE}Removing Superpowers repository...${NC}"
+    printf "${BLUE}Removing Superpowers repository...${NC}\n"
     rm -rf "$SUPERPOWERS_REPO_DIR"
-    echo -e "${GREEN}✓ Superpowers repository removed${NC}"
+    printf "${GREEN}✓ Superpowers repository removed${NC}\n"
 
     # Remove personal skills if requested
     if [[ $REMOVE_SKILLS =~ ^[Yy]$ ]]; then
         echo ""
-        echo -e "${BLUE}Removing personal skills...${NC}"
+        printf "${BLUE}Removing personal skills...${NC}\n"
         rm -rf "$PERSONAL_SKILLS_DIR"
-        echo -e "${GREEN}✓ Personal skills removed${NC}"
+        printf "${GREEN}✓ Personal skills removed${NC}\n"
     fi
 
-    # Success\!
+    # Update Augment settings
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}║            ✓ Uninstall Complete\!                          ║${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    printf "${BLUE}Updating Augment configuration...${NC}\n"
+    if remove_from_settings; then
+        printf "${GREEN}✓ Settings updated${NC}\n"
+        echo "  Location: $AUGMENT_SETTINGS"
+    else
+        printf "${YELLOW}⚠ Could not automatically update settings${NC}\n"
+        echo "  Please manually remove 'superpowers' from ~/.augment/settings.json"
+    fi
+
+    # Success!
     echo ""
-    echo -e "${YELLOW}Don't forget to:${NC}"
-    echo "  1. Remove 'superpowers' from ~/.augment/settings.json"
-    echo "  2. Restart Augment"
+    printf "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}║                 ✓ Uninstall Complete!                      ║${NC}\n"
+    printf "${CYAN}║                                                            ║${NC}\n"
+    printf "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}\n"
     echo ""
-    echo -e "${BLUE}MCP server files remain at:${NC}"
-    echo "  ${SCRIPT_DIR}"
+    printf "${YELLOW}Next Steps:${NC}\n"
+    echo "  1. Restart Augment"
+    echo ""
+    printf "${BLUE}MCP server files remain at:${NC}\n"
+    printf "  ${SCRIPT_DIR}\n"
     echo "  (You can delete this directory if you want)"
     echo ""
 }
 
 # Update function
 update_superpowers() {
-    echo -e "${BLUE}Updating Superpowers...${NC}"
+    printf "${BLUE}Updating Superpowers...${NC}\n"
     echo ""
 
-    if [ \! -d "$SUPERPOWERS_REPO_DIR" ]; then
-        echo -e "${RED}✗ Superpowers repository not found${NC}"
-        echo "  Run: ${CYAN}./install.sh install${NC}"
+    if [ ! -d "$SUPERPOWERS_REPO_DIR" ]; then
+        printf "${RED}✗ Superpowers repository not found${NC}\n"
+        printf "  Run: ${CYAN}./install.sh install${NC}\n"
         exit 1
     fi
 
     cd "$SUPERPOWERS_REPO_DIR"
 
-    echo -e "${BLUE}Pulling latest changes from repository...${NC}"
+    printf "${BLUE}Pulling latest changes from repository...${NC}\n"
     if git pull; then
-        echo -e "${GREEN}✓ Repository updated${NC}"
+        printf "${GREEN}✓ Repository updated${NC}\n"
     else
-        echo -e "${RED}✗ Repository update failed${NC}"
+        printf "${RED}✗ Repository update failed${NC}\n"
         echo "You may need to reinstall."
         exit 1
     fi
@@ -255,14 +357,14 @@ update_superpowers() {
     # Update MCP server dependencies if needed
     if [ -f "${SCRIPT_DIR}/package.json" ]; then
         echo ""
-        echo -e "${BLUE}Updating MCP server dependencies...${NC}"
+        printf "${BLUE}Updating MCP server dependencies...${NC}\n"
         cd "$SCRIPT_DIR"
         npm install
-        echo -e "${GREEN}✓ Dependencies updated${NC}"
+        printf "${GREEN}✓ Dependencies updated${NC}\n"
     fi
     
     echo ""
-    echo -e "${GREEN}✓ Update complete${NC}"
+    printf "${GREEN}✓ Update complete${NC}\n"
     echo ""
     echo "Restart Augment to use the updated version."
     echo ""
@@ -278,7 +380,7 @@ main() {
     case "$ACTION" in
         install)
             if is_installed; then
-                echo -e "${YELLOW}Superpowers is already installed.${NC}"
+                printf "${YELLOW}Superpowers is already installed.${NC}\n"
                 echo ""
                 read -p "Do you want to update it instead? [y/N] " -n 1 -r
                 echo ""
@@ -296,7 +398,7 @@ main() {
             if is_installed; then
                 uninstall_superpowers
             else
-                echo -e "${YELLOW}Superpowers is not installed.${NC}"
+                printf "${YELLOW}Superpowers is not installed.${NC}\n"
                 echo ""
                 echo "Nothing to uninstall."
             fi
@@ -306,15 +408,15 @@ main() {
             if is_installed; then
                 update_superpowers
             else
-                echo -e "${YELLOW}Superpowers is not installed.${NC}"
+                printf "${YELLOW}Superpowers is not installed.${NC}\n"
                 echo ""
-                echo "Run: ${CYAN}./install.sh install${NC}"
+                printf "Run: ${CYAN}./install.sh install${NC}\n"
             fi
             ;;
 
         auto)
             if is_installed; then
-                echo -e "${GREEN}Superpowers is currently installed.${NC}"
+                printf "${GREEN}Superpowers is currently installed.${NC}\n"
                 echo "  Repository: $SUPERPOWERS_REPO_DIR"
                 echo "  MCP Server: $SCRIPT_DIR"
                 echo ""
@@ -339,13 +441,13 @@ main() {
                         ;;
                 esac
             else
-                echo -e "${YELLOW}Superpowers is not currently installed.${NC}"
+                printf "${YELLOW}Superpowers is not currently installed.${NC}\n"
                 echo ""
                 read -p "Would you like to install it? [Y/n] " -n 1 -r
                 echo ""
                 echo ""
 
-                if [[ \! $REPLY =~ ^[Nn]$ ]]; then
+                if [[ ! $REPLY =~ ^[Nn]$ ]]; then
                     install_superpowers
                 else
                     echo "Installation cancelled."
@@ -354,7 +456,7 @@ main() {
             ;;
 
         *)
-            echo -e "${RED}Unknown command: $ACTION${NC}"
+            printf "${RED}Unknown command: $ACTION${NC}\n"
             echo ""
             echo "Usage:"
             echo "  ./install.sh          # Interactive mode"

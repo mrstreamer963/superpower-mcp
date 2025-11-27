@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Superpowers MCP Server for Auggie CLI
- * 
+ * Superpowers MCP Server for Augment CLI
+ *
  * Exposes skills from the superpowers repository as MCP tools.
  * Reads skills from:
- * - ~/.auggie/superpowers/skills (upstream superpowers)
- * - ~/.auggie/skills (personal skills)
+ * - ~/.augment/superpowers/skills (upstream superpowers)
+ * - ~/.augment/skills (personal skills)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -24,8 +24,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const homeDir = os.homedir();
-const superpowersSkillsDir = path.join(homeDir, '.auggie/superpowers/skills');
-const personalSkillsDir = path.join(homeDir, '.auggie/skills');
+const superpowersSkillsDir = path.join(homeDir, '.augment/superpowers/skills');
+const personalSkillsDir = path.join(homeDir, '.augment/skills');
 
 /**
  * Extract YAML frontmatter from a skill file.
@@ -227,7 +227,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: 'text',
-          text: 'No skills found. Install superpowers skills to ~/.auggie/superpowers/skills/ or add personal skills to ~/.auggie/skills/'
+          text: 'No skills found. Install superpowers skills to ~/.augment/superpowers/skills/ or add personal skills to ~/.augment/skills/'
         }]
       };
     }
