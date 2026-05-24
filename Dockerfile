@@ -1,26 +1,25 @@
-# --- Этап 1: Сборка и установка зависимостей ---
-FROM node:18-alpine AS builder
+# Используем легковесный образ Node.js
+FROM node:18-alpine
 
-# Устанавливаем git, необходимый для работы install.sh и загрузки скиллов
-RUN apk add --no-cache git bash
+# Устанавливаем Git (он необходим для работы сервера)
+RUN apk add --no-cache git
 
+# Создаем рабочую директорию
 WORKDIR /app
 
-# Копируем файлы конфигурации npm
+# Копируем файлы конфигурации зависимостей
 COPY package*.json ./
 
-# Устанавливаем зависимости (включая dev-зависимости, если нужны для сборки)
-RUN npm i
+# Устанавливаем только production-зависимости
+RUN npm install --production
 
-# Копируем остальные файлы исходного кода
-COPY . .
+# Копируем исходный код сервера
+COPY superpowers-mcp.js ./
 
-WORKDIR /app
+COPY ./skills ./skills
 
-# Создаем структуру директорий в домашней папке (~/.augment/)
-# и клонируем репозиторий superpowers, симулируя работу install.sh
-# RUN mkdir -p /root/.augment/skills && \
-#     git clone https://github.com/root/.augment/superpowers
+# Создаем стандартные директории для хранения навыков
+# RUN mkdir -p /root/.augment/superpowers /root/.augment/skills
 
-# MCP-серверы общаются через стандартные потоки ввода-вывода (stdio)
-ENTRYPOINT ["node", "superpowers-mcp.js"]
+# По умолчанию запускаем сервер через stdio
+CMD ["node", "superpowers-mcp.js"]
