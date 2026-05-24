@@ -23,9 +23,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const homeDir = os.homedir();
-const superpowersSkillsDir = path.join(homeDir, '.augment/superpowers/skills');
-const personalSkillsDir = path.join(homeDir, '.augment/skills');
+const currentDir = process.cwd();
+const superpowersSkillsDir = path.join(currentDir, './skills/superpowers/skills');
+const personalSkillsDir = path.join(currentDir, './skills');
 
 /**
  * Extract YAML frontmatter from a skill file.

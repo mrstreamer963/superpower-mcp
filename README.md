@@ -1,63 +1,81 @@
-# Superpowers MCP Server for Augment
+# Superpowers MCP Server
 
-An MCP (Model Context Protocol) server that brings the powerful [Superpowers](https://github.com/obra/superpowers) skills library to Augment CLI. Access proven workflows, expert techniques, and best practices directly in your AI coding assistant.
+MCP (Model Context Protocol) server that connects the [Superpowers](https://github.com/obra/superpowers) skill library to any MCP-compatible assistant (Claude, Augment, etc.). Skills are expert workflows that improve AI assistant outcomes.
 
-## What is This?
+## What is this?
 
-This MCP server exposes the Superpowers skills library as tools that Augment can use. Skills are expert-crafted workflows and processes that guide AI assistants to produce better results.
+The server provides Superpowers skills as MCP tools.
 
-**Available Tools:**
-- `find_skills` - List all available skills from both the superpowers library and your personal skills
-- `use_skill` - Load a specific skill to guide your work
-
-## Prerequisites
-
-- **Node.js** v18 or higher ([Download](https://nodejs.org/))
-- **Git** ([Download](https://git-scm.com/))
-- **Augment CLI** with MCP support
+**Available tools:**
+- `find_skills` — list all available skills
+- `use_skill` — load a specific skill for use
 
 ## Quick Start
 
-### 1. Clone and Install
+### 1. Build the Docker Image
 
 ```bash
-git clone https://github.com/jmcdice/superpower-mcp.git
+git clone https://github.com/mrstreamer963/superpower-mcp.git
 cd superpower-mcp
-./install.sh
+make build
 ```
 
-The installer will:
-- Clone the upstream Superpowers repository to `~/.augment/superpowers`
-- Create a personal skills directory at `~/.augment/skills`
-- Install MCP server dependencies
-- Provide configuration instructions
+Or manually:
 
-### 2. Configure Augment
+```bash
+docker build -t superpower-mcp:latest .
+```
 
-Add the MCP server to your Augment configuration file (`~/.augment/settings.json`):
+### 2. Configure the MCP Client
+
+Add the server to your MCP client configuration.
+
+**For Claude Desktop (`claude_desktop_config.json`):**
 
 ```json
 {
   "mcpServers": {
     "superpowers": {
-      "command": "node",
+      "command": "docker",
       "args": [
-        "/path/to/superpower-mcp/superpowers-mcp.js"
+        "run",
+        "-i",
+        "--rm",
+        "superpower-mcp:latest"
       ]
     }
   }
 }
 ```
 
-**Note:** Replace `/path/to/superpower-mcp/` with the actual path where you cloned this repository. The installer will show you the exact path to use.
+**For Augment CLI (`~/.augment/settings.json`):**
 
-### 3. Restart Augment
+```json
+{
+  "mcpServers": {
+    "superpowers": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "superpower-mcp:latest"
+      ]
+    }
+  }
+}
+```
 
-Restart Augment to load the new MCP server.
+> **Important:** Use the `-i --rm` flags (without `-t`) so the server runs in stdio mode, which is required for MCP.
 
-### 4. Test It
+### 3. Restart the Client
 
-Ask Augment:
+Restart your MCP client to load the new server.
+
+### 4. Verification
+
+Ask your assistant:
+
 ```
 "What skills are available?"
 ```
@@ -68,13 +86,15 @@ You should see a list of skills from the Superpowers library.
 
 ### Finding Skills
 
-Ask Augment to list available skills:
+Ask the assistant to show available skills:
+
 ```
-"Show me available skills"
+"Show available skills"
 "What skills can you use?"
 ```
 
 Or use the tool directly:
+
 ```
 find_skills()
 ```
@@ -82,129 +102,129 @@ find_skills()
 ### Using Skills
 
 Load a skill by name:
+
 ```
 "Use the brainstorming skill"
 "Load the test-driven-development skill"
 ```
 
-Or use the tool directly:
+Or directly:
+
 ```
 use_skill("superpowers:brainstorming")
 use_skill("superpowers:test-driven-development")
 ```
 
-### Skill Naming Convention
+### Naming Convention
 
-- **Superpowers skills**: `superpowers:skill-name` (from the upstream repository)
-- **Personal skills**: `my-skill-name` (from `~/.augment/skills/`)
-
-Personal skills with the same name as superpowers skills will override them.
+- **Superpowers skills**: `superpowers:skill-name` (from the built-in repository)
+- **Personal skills**: `my-skill-name` (added to the image)
 
 ## Creating Personal Skills
 
-1. Create a directory in `~/.augment/skills/` with your skill name:
-   ```bash
-   mkdir -p ~/.augment/skills/my-custom-skill
-   ```
+If you built the image with your own skills (see the build section), create the structure in `skills/your-skill/SKILL.md`:
 
-2. Add a `SKILL.md` file with YAML frontmatter:
-   ```markdown
-   ---
-   name: my-custom-skill
-   description: Use when you need to do something specific
-   ---
+```markdown
+---
+name: my-custom-skill
+description: Use when you need to do something specific
+---
 
-   # My Custom Skill
+# My Skill
 
-   ## Purpose
-   [Describe what this skill does]
+## Purpose
+[Describe what this skill does]
 
-   ## When to Use
-   [Describe when to use this skill]
+## When to Use
+[Describe when to use this skill]
 
-   ## Process
-   1. [Step 1]
-   2. [Step 2]
-   3. [Step 3]
-   ```
+## Process
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+```
 
-3. The skill will automatically be available through `find_skills` and `use_skill`
+Personal skills with the same name as Superpowers skills override them.
 
 ## Architecture
 
-This is an overlay approach that works with the upstream Superpowers repository:
+The project uses an overlay approach:
 
-- **Upstream repository**: `~/.augment/superpowers` (read-only, updated via git pull)
-- **MCP server**: This repository (custom Augment integration)
-- **Personal skills**: `~/.augment/skills` (your custom skills)
+- **Docker image** — contains both the built-in Superpowers repository and optional personal skills from the `./skills/` directory at build time
+- **MCP server** — runs inside the container, communicates via stdio
+- **Client** — any MCP-compatible assistant (Claude, Augment, etc.)
 
-The MCP server reads skills from both the upstream repository and your personal skills directory.
+The Dockerfile copies `./skills` from the repository directly into the image, so any skills added to this directory will be automatically available.
 
 ## Management
 
-### Update Superpowers
-
-To get the latest skills from the upstream repository:
+### Updating Superpowers Skills
 
 ```bash
-./install.sh update
+git pull                    # get the latest code
+git submodule update --init --recursive  # update the built-in superpowers repository
+make build                  # rebuild the image
 ```
 
-Then restart Augment.
+After that, restart your MCP client.
 
-### Uninstall
+### Removal
 
 ```bash
-./install.sh remove
+docker rmi superpower-mcp:latest
 ```
 
-This will:
-- Remove the Superpowers repository (`~/.augment/superpowers`)
-- Optionally remove your personal skills (`~/.augment/skills`)
-- Keep the MCP server files (you can delete them manually if desired)
+Don't forget to remove the server configuration from your MCP client settings.
 
-Don't forget to remove the MCP server configuration from `~/.augment/settings.json` and restart Augment.
+## Rebuilding with Personal Skills
+
+1. Add your skills to the `./skills/your-skill/SKILL.md` directory
+2. Rebuild the image:
+   ```bash
+   make build
+   ```
+3. Personal skills will be available via `find_skills` and `use_skill`
 
 ## Troubleshooting
 
-### MCP Server Not Showing Up
+### Server Not Showing Up
 
-1. Check that the path in `~/.augment/settings.json` is correct
-2. Verify Node.js is installed: `node --version` (should be v18+)
-3. Check that dependencies are installed: `ls node_modules` in the repo directory
-4. Restart Augment completely
+1. Check that the image is built: `docker images superpower-mcp`
+2. Check your MCP client configuration — the command should be `docker run -i --rm superpower-mcp:latest` (without `-t`)
+3. Check that Docker is available: `docker --version`
+4. Fully restart your MCP client
 
 ### Skills Not Loading
 
-1. Verify the Superpowers repository exists: `ls ~/.augment/superpowers/skills`
-2. Run `./install.sh update` to refresh the repository
-3. Check skill file format (must have YAML frontmatter and be named `SKILL.md`)
+1. Check that the image contains skills: `docker run --rm superpower-mcp:latest ls /app/skills/superpowers/skills`
+2. Rebuild the image after updating the submodule: `git submodule update --init --recursive && make build`
 
-### Permission Errors
+### Sanity Check
 
-Make sure the install script is executable:
 ```bash
-chmod +x install.sh
+# Verify that the server responds via stdio
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | docker run -i --rm superpower-mcp:latest
 ```
+
+This request should return JSON with the list of tools (`find_skills` and `use_skill`).
 
 ## Links
 
 - **Superpowers Repository**: https://github.com/obra/superpowers
 - **Blog Post**: [Superpowers for Claude Code](https://blog.fsck.com/2025/10/09/superpowers/)
 - **Model Context Protocol**: https://modelcontextprotocol.io/
-- **Augment**: https://www.augmentcode.com/
 
 ## Contributing
 
-Issues and pull requests are welcome\! This is a community project to make Superpowers accessible to Augment users.
+Issues and pull requests are welcome!
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License — see the LICENSE file for details.
 
-The upstream Superpowers repository has its own license. Please refer to https://github.com/obra/superpowers for details.
+The Superpowers repository has its own license. See https://github.com/obra/superpowers.
 
-## Credits
+## Acknowledgments
 
 - **Superpowers** by [Jesse Vincent](https://github.com/obra)
-- **MCP Server** integration for Augment
+- **MCP Server** [integration](https://github.com/jmcdice/superpower-mcp/)
