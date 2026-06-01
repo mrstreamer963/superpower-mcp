@@ -111,50 +111,17 @@ Load a skill by name:
 Or directly:
 
 ```
-use_skill("superpowers:brainstorming")
-use_skill("superpowers:test-driven-development")
+use_skill("brainstorming")
+use_skill("test-driven-development")
 ```
 
-### Naming Convention
-
-- **Superpowers skills**: `superpowers:skill-name` (from the built-in repository)
-- **Personal skills**: `my-skill-name` (added to the image)
-
-## Creating Personal Skills
-
-If you built the image with your own skills (see the build section), create the structure in `skills/your-skill/SKILL.md`:
-
-```markdown
----
-name: my-custom-skill
-description: Use when you need to do something specific
----
-
-# My Skill
-
-## Purpose
-[Describe what this skill does]
-
-## When to Use
-[Describe when to use this skill]
-
-## Process
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-```
-
-Personal skills with the same name as Superpowers skills override them.
+All skills are from the Superpowers library and are prefixed with `superpowers:` in the output.
 
 ## Architecture
 
-The project uses an overlay approach:
-
-- **Docker image** — contains both the built-in Superpowers repository and optional personal skills from the `./skills/` directory at build time
+- **Docker image** — contains the Superpowers repository as a git submodule
 - **MCP server** — runs inside the container, communicates via stdio
 - **Client** — any MCP-compatible assistant (Claude, Augment, etc.)
-
-The Dockerfile copies `./skills` from the repository directly into the image, so any skills added to this directory will be automatically available.
 
 ## Management
 
@@ -175,15 +142,6 @@ docker rmi superpower-mcp:latest
 ```
 
 Don't forget to remove the server configuration from your MCP client settings.
-
-## Rebuilding with Personal Skills
-
-1. Add your skills to the `./skills/your-skill/SKILL.md` directory
-2. Rebuild the image:
-   ```bash
-   make build
-   ```
-3. Personal skills will be available via `find_skills` and `use_skill`
 
 ## Troubleshooting
 

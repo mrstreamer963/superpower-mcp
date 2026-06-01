@@ -5,8 +5,7 @@
  *
  * Exposes skills from the superpowers repository as MCP tools.
  * Reads skills from:
- * - ~/.augment/superpowers/skills (upstream superpowers)
- * - ~/.augment/skills (personal skills)
+ * - ./skills/superpowers/skills (superpowers skills)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -25,7 +24,6 @@ const __dirname = path.dirname(__filename);
 
 const currentDir = process.cwd();
 const superpowersSkillsDir = path.join(currentDir, './skills/superpowers/skills');
-const personalSkillsDir = path.join(currentDir, './skills');
 
 /**
  * Extract YAML frontmatter from a skill file.
@@ -132,33 +130,16 @@ function findSkillsInDir(dir, sourceType, maxDepth = 3) {
  * Resolve a skill name to its file path.
  */
 function resolveSkillPath(skillName) {
-  const forceSuperpowers = skillName.startsWith('superpowers:');
-  const actualSkillName = forceSuperpowers ? skillName.replace(/^superpowers:/, '') : skillName;
+  const actualSkillName = skillName.replace(/^superpowers:/, '');
 
-  // Try personal skills first (unless explicitly superpowers:)
-  if (!forceSuperpowers && personalSkillsDir) {
-    const personalPath = path.join(personalSkillsDir, actualSkillName);
-    const personalSkillFile = path.join(personalPath, 'SKILL.md');
-    if (fs.existsSync(personalSkillFile)) {
-      return {
-        skillFile: personalSkillFile,
-        sourceType: 'personal',
-        skillPath: actualSkillName
-      };
-    }
-  }
-
-  // Try superpowers skills
-  if (superpowersSkillsDir) {
-    const superpowersPath = path.join(superpowersSkillsDir, actualSkillName);
-    const superpowersSkillFile = path.join(superpowersPath, 'SKILL.md');
-    if (fs.existsSync(superpowersSkillFile)) {
-      return {
-        skillFile: superpowersSkillFile,
-        sourceType: 'superpowers',
-        skillPath: actualSkillName
-      };
-    }
+  const superpowersPath = path.join(superpowersSkillsDir, actualSkillName);
+  const superpowersSkillFile = path.join(superpowersPath, 'SKILL.md');
+  if (fs.existsSync(superpowersSkillFile)) {
+    return {
+      skillFile: superpowersSkillFile,
+      sourceType: 'superpowers',
+      skillPath: actualSkillName
+    };
   }
 
   return null;
@@ -179,15 +160,12 @@ const server = new Server(
 
 // List all available tools (skills)
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  const personalSkills = findSkillsInDir(personalSkillsDir, 'personal', 3);
   const superpowersSkills = findSkillsInDir(superpowersSkillsDir, 'superpowers', 3);
-
-  const allSkills = [...personalSkills, ...superpowersSkills];
 
   const tools = [
     {
       name: 'find_skills',
-      description: 'List all available skills in the personal and superpowers skill libraries.',
+      description: 'List all available skills in the superpowers skill library.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -202,7 +180,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         properties: {
           skill_name: {
             type: 'string',
-            description: 'Name of the skill to load (e.g., "superpowers:brainstorming", "my-custom-skill")'
+            description: 'Name of the skill to load (e.g., "brainstorming", "test-driven-development")'
           }
         },
         required: ['skill_name']
@@ -218,27 +196,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   if (name === 'find_skills') {
-    const personalSkills = findSkillsInDir(personalSkillsDir, 'personal', 3);
     const superpowersSkills = findSkillsInDir(superpowersSkillsDir, 'superpowers', 3);
 
-    const allSkills = [...personalSkills, ...superpowersSkills];
-
-    if (allSkills.length === 0) {
+    if (superpowersSkills.length === 0) {
       return {
         content: [{
           type: 'text',
-          text: 'No skills found. Install superpowers skills to ~/.augment/superpowers/skills/ or add personal skills to ~/.augment/skills/'
+          text: 'No skills found. Make sure the superpowers submodule is initialized.'
         }]
       };
     }
 
     let output = 'Available skills:\n\n';
 
-    for (const skill of allSkills) {
-      const namespace = skill.sourceType === 'personal' ? '' : 'superpowers:';
+    for (const skill of superpowersSkills) {
       const skillName = skill.name || path.basename(skill.path);
 
-      output += `${namespace}${skillName}\n`;
+      output += `superpowers:${skillName}\n`;
       if (skill.description) {
         output += `  ${skill.description}\n`;
       }
